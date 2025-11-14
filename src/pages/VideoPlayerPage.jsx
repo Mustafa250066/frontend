@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import axios from 'axios';
-import { API, getUserSession } from '../App';
-import { Button } from '@/components/ui/button';
-import { ArrowLeft, Info } from 'lucide-react';
-import { toast } from 'sonner';
+import React, { useState, useEffect, useRef } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import axios from "axios";
+import { API, getUserSession } from "../App";
+import { Button } from "@/components/ui/button";
+import { ArrowLeft, Info } from "lucide-react";
+import { toast } from "sonner";
+import { detectVideoType } from "@/lib/utils";
 
 const VideoPlayerPage = () => {
   const { episodeId } = useParams();
@@ -14,6 +15,7 @@ const VideoPlayerPage = () => {
   const [show, setShow] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showInfo, setShowInfo] = useState(false);
+  const [videoInfo, setVideoInfo] = useState({ type: "direct", url: "" });
   const progressInterval = useRef(null);
 
   useEffect(() => {
@@ -30,18 +32,28 @@ const VideoPlayerPage = () => {
       const episodeRes = await axios.get(`${API}/episodes/${episodeId}`);
       setEpisode(episodeRes.data);
 
-      const showRes = await axios.get(`${API}/shows/${episodeRes.data.show_id}`);
+      // Detect video type and convert URL if needed
+      const videoData = detectVideoType(episodeRes.data.video_url);
+      setVideoInfo(videoData);
+
+      const showRes = await axios.get(
+        `${API}/shows/${episodeRes.data.show_id}`
+      );
       setShow(showRes.data);
 
-      // Load saved progress
-      const userSession = getUserSession();
-      const progressRes = await axios.get(`${API}/watch-progress/${userSession}/${episodeId}`);
-      if (progressRes.data.progress > 0 && videoRef.current) {
-        videoRef.current.currentTime = progressRes.data.progress;
+      // Load saved progress (only for direct video files)
+      if (videoData.type === "direct") {
+        const userSession = getUserSession();
+        const progressRes = await axios.get(
+          `${API}/watch-progress/${userSession}/${episodeId}`
+        );
+        if (progressRes.data.progress > 0 && videoRef.current) {
+          videoRef.current.currentTime = progressRes.data.progress;
+        }
       }
     } catch (error) {
-      console.error('Error fetching episode:', error);
-      toast.error('Failed to load video');
+      console.error("Error fetching episode:", error);
+      toast.error("Failed to load video");
     } finally {
       setLoading(false);
     }
@@ -74,7 +86,7 @@ const VideoPlayerPage = () => {
         progress: currentTime,
       });
     } catch (error) {
-      console.error('Error saving progress:', error);
+      console.error("Error saving progress:", error);
     }
   };
 
@@ -120,31 +132,45 @@ const VideoPlayerPage = () => {
 
       {/* Video Player */}
       <div className="relative w-full h-screen flex items-center justify-center bg-black">
-        <video
-          ref={videoRef}
-          data-testid="video-player"
-          className="w-full h-full"
-          controls
-          controlsList="nodownload"
-          onPlay={handleVideoPlay}
-          onPause={handleVideoPause}
-          onEnded={handleVideoPause}
-          src={episode.video_url}
-        >
-          <source src={episode.video_url} type="video/mp4" />
-          Your browser does not support the video tag.
-        </video>
+        {videoInfo.type === "direct" ? (
+          <video
+            ref={videoRef}
+            data-testid="video-player"
+            className="w-full h-full"
+            controls
+            controlsList="nodownload"
+            onPlay={handleVideoPlay}
+            onPause={handleVideoPause}
+            onEnded={handleVideoPause}
+            src={videoInfo.url}
+          >
+            <source src={videoInfo.url} type="video/mp4" />
+            Your browser does not support the video tag.
+          </video>
+        ) : (
+          <iframe
+            data-testid="video-player"
+            src={videoInfo.url}
+            className="w-full h-full"
+            frameBorder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+            title="Video Player"
+          />
+        )}
       </div>
 
       {/* Episode Info Overlay */}
       {showInfo && (
         <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-black via-black/95 to-transparent p-8 z-40">
           <div className="max-w-4xl mx-auto">
-            {show && (
-              <p className="text-gray-400 text-sm mb-2">{show.name}</p>
+            {show && <p className="text-gray-400 text-sm mb-2">{show.name}</p>}
+            {episode.title && (
+              <h2 className="text-3xl font-bold mb-2">{episode.title}</h2>
             )}
-            <h2 className="text-3xl font-bold mb-2">{episode.title}</h2>
-            <p className="text-gray-300 mb-4">Episode {episode.episode_number}</p>
+            <p className="text-gray-300 mb-4">
+              Episode {episode.episode_number}
+            </p>
             {episode.description && (
               <p className="text-gray-400">{episode.description}</p>
             )}

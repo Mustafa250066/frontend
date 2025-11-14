@@ -38,6 +38,11 @@ const AdminDashboard = () => {
   const [seasonDialog, setSeasonDialog] = useState(false);
   const [episodeDialog, setEpisodeDialog] = useState(false);
   const [passwordDialog, setPasswordDialog] = useState(false);
+  
+  // Edit states
+  const [editingShow, setEditingShow] = useState(null);
+  const [editingSeason, setEditingSeason] = useState(null);
+  const [editingEpisode, setEditingEpisode] = useState(null);
 
   // Forms
   const [showForm, setShowForm] = useState({ name: '', description: '', poster_url: '' });
@@ -117,14 +122,30 @@ const AdminDashboard = () => {
   const handleCreateShow = async (e) => {
     e.preventDefault();
     try {
-      await axiosInstance.post('/shows', showForm);
-      toast.success('Show created successfully');
+      if (editingShow) {
+        await axiosInstance.put(`/shows/${editingShow.id}`, showForm);
+        toast.success('Show updated successfully');
+      } else {
+        await axiosInstance.post('/shows', showForm);
+        toast.success('Show created successfully');
+      }
       setShowDialog(false);
       setShowForm({ name: '', description: '', poster_url: '' });
+      setEditingShow(null);
       fetchAllData();
     } catch (error) {
-      toast.error('Failed to create show');
+      toast.error(editingShow ? 'Failed to update show' : 'Failed to create show');
     }
+  };
+
+  const handleEditShow = (show) => {
+    setEditingShow(show);
+    setShowForm({
+      name: show.name || '',
+      description: show.description || '',
+      poster_url: show.poster_url || '',
+    });
+    setShowDialog(true);
   };
 
   const handleDeleteShow = async (showId) => {
@@ -142,17 +163,34 @@ const AdminDashboard = () => {
   const handleCreateSeason = async (e) => {
     e.preventDefault();
     try {
-      await axiosInstance.post('/seasons', {
+      const seasonData = {
         ...seasonForm,
         season_number: parseInt(seasonForm.season_number),
-      });
-      toast.success('Season created successfully');
+      };
+      if (editingSeason) {
+        await axiosInstance.put(`/seasons/${editingSeason.id}`, seasonData);
+        toast.success('Season updated successfully');
+      } else {
+        await axiosInstance.post('/seasons', seasonData);
+        toast.success('Season created successfully');
+      }
       setSeasonDialog(false);
       setSeasonForm({ show_id: '', season_number: '', name: '' });
+      setEditingSeason(null);
       fetchAllData();
     } catch (error) {
-      toast.error('Failed to create season');
+      toast.error(editingSeason ? 'Failed to update season' : 'Failed to create season');
     }
+  };
+
+  const handleEditSeason = (season) => {
+    setEditingSeason(season);
+    setSeasonForm({
+      show_id: season.show_id || '',
+      season_number: season.season_number?.toString() || '',
+      name: season.name || '',
+    });
+    setSeasonDialog(true);
   };
 
   const handleDeleteSeason = async (seasonId) => {
@@ -175,8 +213,13 @@ const AdminDashboard = () => {
         episode_number: parseInt(episodeForm.episode_number),
         duration: episodeForm.duration ? parseInt(episodeForm.duration) : null,
       };
-      await axiosInstance.post('/episodes', episodeData);
-      toast.success('Episode created successfully');
+      if (editingEpisode) {
+        await axiosInstance.put(`/episodes/${editingEpisode.id}`, episodeData);
+        toast.success('Episode updated successfully');
+      } else {
+        await axiosInstance.post('/episodes', episodeData);
+        toast.success('Episode created successfully');
+      }
       setEpisodeDialog(false);
       setEpisodeForm({
         show_id: '',
@@ -188,10 +231,26 @@ const AdminDashboard = () => {
         duration: '',
         thumbnail_url: '',
       });
+      setEditingEpisode(null);
       fetchAllData();
     } catch (error) {
-      toast.error('Failed to create episode');
+      toast.error(editingEpisode ? 'Failed to update episode' : 'Failed to create episode');
     }
+  };
+
+  const handleEditEpisode = (episode) => {
+    setEditingEpisode(episode);
+    setEpisodeForm({
+      show_id: episode.show_id || '',
+      season_id: episode.season_id || '',
+      episode_number: episode.episode_number?.toString() || '',
+      title: episode.title || '',
+      description: episode.description || '',
+      video_url: episode.video_url || '',
+      duration: episode.duration?.toString() || '',
+      thumbnail_url: episode.thumbnail_url || '',
+    });
+    setEpisodeDialog(true);
   };
 
   const handleDeleteEpisode = async (episodeId) => {
@@ -341,7 +400,13 @@ const AdminDashboard = () => {
           <TabsContent value="shows" className="mt-6">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold">Manage Shows</h2>
-              <Dialog open={showDialog} onOpenChange={setShowDialog}>
+              <Dialog open={showDialog} onOpenChange={(open) => {
+                setShowDialog(open);
+                if (!open) {
+                  setEditingShow(null);
+                  setShowForm({ name: '', description: '', poster_url: '' });
+                }
+              }}>
                 <DialogTrigger asChild>
                   <Button data-testid="add-show-btn" className="bg-[#e50914] hover:bg-[#f40612]">
                     <Plus className="mr-2" /> Add Show
@@ -349,7 +414,7 @@ const AdminDashboard = () => {
                 </DialogTrigger>
                 <DialogContent className="bg-[#1a1a1a] border-gray-800">
                   <DialogHeader>
-                    <DialogTitle>Add New Show</DialogTitle>
+                    <DialogTitle>{editingShow ? 'Edit Show' : 'Add New Show'}</DialogTitle>
                   </DialogHeader>
                   <form onSubmit={handleCreateShow} className="space-y-4">
                     <div>
@@ -378,7 +443,7 @@ const AdminDashboard = () => {
                       />
                     </div>
                     <Button data-testid="create-show-btn" type="submit" className="w-full bg-[#e50914] hover:bg-[#f40612]">
-                      Create Show
+                      {editingShow ? 'Update Show' : 'Create Show'}
                     </Button>
                   </form>
                 </DialogContent>
@@ -393,15 +458,26 @@ const AdminDashboard = () => {
                   )}
                   <h3 className="text-lg font-semibold mb-2">{show.name}</h3>
                   {show.description && <p className="text-sm text-gray-400 mb-3 line-clamp-2">{show.description}</p>}
-                  <Button
-                    data-testid={`delete-show-${show.id}`}
-                    onClick={() => handleDeleteShow(show.id)}
-                    variant="destructive"
-                    size="sm"
-                    className="w-full"
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" /> Delete
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      data-testid={`edit-show-${show.id}`}
+                      onClick={() => handleEditShow(show)}
+                      variant="outline"
+                      size="sm"
+                      className="flex-1"
+                    >
+                      <Edit className="mr-2 h-4 w-4" /> Edit
+                    </Button>
+                    <Button
+                      data-testid={`delete-show-${show.id}`}
+                      onClick={() => handleDeleteShow(show.id)}
+                      variant="destructive"
+                      size="sm"
+                      className="flex-1"
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" /> Delete
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -411,7 +487,13 @@ const AdminDashboard = () => {
           <TabsContent value="seasons" className="mt-6">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold">Manage Seasons</h2>
-              <Dialog open={seasonDialog} onOpenChange={setSeasonDialog}>
+              <Dialog open={seasonDialog} onOpenChange={(open) => {
+                setSeasonDialog(open);
+                if (!open) {
+                  setEditingSeason(null);
+                  setSeasonForm({ show_id: '', season_number: '', name: '' });
+                }
+              }}>
                 <DialogTrigger asChild>
                   <Button data-testid="add-season-btn" className="bg-[#e50914] hover:bg-[#f40612]">
                     <Plus className="mr-2" /> Add Season
@@ -419,7 +501,7 @@ const AdminDashboard = () => {
                 </DialogTrigger>
                 <DialogContent className="bg-[#1a1a1a] border-gray-800">
                   <DialogHeader>
-                    <DialogTitle>Add New Season</DialogTitle>
+                    <DialogTitle>{editingSeason ? 'Edit Season' : 'Add New Season'}</DialogTitle>
                   </DialogHeader>
                   <form onSubmit={handleCreateSeason} className="space-y-4">
                     <div>
@@ -460,7 +542,7 @@ const AdminDashboard = () => {
                       />
                     </div>
                     <Button data-testid="create-season-btn" type="submit" className="w-full bg-[#e50914] hover:bg-[#f40612]">
-                      Create Season
+                      {editingSeason ? 'Update Season' : 'Create Season'}
                     </Button>
                   </form>
                 </DialogContent>
@@ -481,14 +563,24 @@ const AdminDashboard = () => {
                             Season {season.season_number}
                             {season.name && ` - ${season.name}`}
                           </span>
-                          <Button
-                            data-testid={`delete-season-${season.id}`}
-                            onClick={() => handleDeleteSeason(season.id)}
-                            variant="destructive"
-                            size="sm"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <div className="flex gap-2">
+                            <Button
+                              data-testid={`edit-season-${season.id}`}
+                              onClick={() => handleEditSeason(season)}
+                              variant="outline"
+                              size="sm"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              data-testid={`delete-season-${season.id}`}
+                              onClick={() => handleDeleteSeason(season.id)}
+                              variant="destructive"
+                              size="sm"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -502,7 +594,22 @@ const AdminDashboard = () => {
           <TabsContent value="episodes" className="mt-6">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold">Manage Episodes</h2>
-              <Dialog open={episodeDialog} onOpenChange={setEpisodeDialog}>
+              <Dialog open={episodeDialog} onOpenChange={(open) => {
+                setEpisodeDialog(open);
+                if (!open) {
+                  setEditingEpisode(null);
+                  setEpisodeForm({
+                    show_id: '',
+                    season_id: '',
+                    episode_number: '',
+                    title: '',
+                    description: '',
+                    video_url: '',
+                    duration: '',
+                    thumbnail_url: '',
+                  });
+                }
+              }}>
                 <DialogTrigger asChild>
                   <Button data-testid="add-episode-btn" className="bg-[#e50914] hover:bg-[#f40612]">
                     <Plus className="mr-2" /> Add Episode
@@ -510,7 +617,7 @@ const AdminDashboard = () => {
                 </DialogTrigger>
                 <DialogContent className="bg-[#1a1a1a] border-gray-800 max-w-2xl max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
-                    <DialogTitle>Add New Episode</DialogTitle>
+                    <DialogTitle>{editingEpisode ? 'Edit Episode' : 'Add New Episode'}</DialogTitle>
                   </DialogHeader>
                   <form onSubmit={handleCreateEpisode} className="space-y-4">
                     <div>
@@ -564,12 +671,11 @@ const AdminDashboard = () => {
                       />
                     </div>
                     <div>
-                      <Label>Episode Title *</Label>
+                      <Label>Episode Title (Optional)</Label>
                       <Input
                         data-testid="episode-title-input"
                         value={episodeForm.title}
                         onChange={(e) => setEpisodeForm({ ...episodeForm, title: e.target.value })}
-                        required
                       />
                     </div>
                     <div>
@@ -608,7 +714,7 @@ const AdminDashboard = () => {
                       />
                     </div>
                     <Button data-testid="create-episode-btn" type="submit" className="w-full bg-[#e50914] hover:bg-[#f40612]">
-                      Create Episode
+                      {editingEpisode ? 'Update Episode' : 'Create Episode'}
                     </Button>
                   </form>
                 </DialogContent>
@@ -627,21 +733,31 @@ const AdminDashboard = () => {
                           {show?.name} - Season {season?.season_number}
                         </p>
                         <h3 className="text-lg font-semibold mb-2">
-                          Episode {episode.episode_number}: {episode.title}
+                          Episode {episode.episode_number}{episode.title ? `: ${episode.title}` : ''}
                         </h3>
                         {episode.description && (
                           <p className="text-sm text-gray-400 mb-2">{episode.description}</p>
                         )}
                         <p className="text-sm text-gray-500 truncate">URL: {episode.video_url}</p>
                       </div>
-                      <Button
-                        data-testid={`delete-episode-${episode.id}`}
-                        onClick={() => handleDeleteEpisode(episode.id)}
-                        variant="destructive"
-                        size="sm"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          data-testid={`edit-episode-${episode.id}`}
+                          onClick={() => handleEditEpisode(episode)}
+                          variant="outline"
+                          size="sm"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          data-testid={`delete-episode-${episode.id}`}
+                          onClick={() => handleDeleteEpisode(episode.id)}
+                          variant="destructive"
+                          size="sm"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 );

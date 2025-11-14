@@ -1,16 +1,43 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import axios from 'axios';
-import { API } from '../App';
-import { Button } from '@/components/ui/button';
-import { ArrowLeft, Play, ChevronDown, ChevronUp } from 'lucide-react';
-import { toast } from 'sonner';
+import React, { useState, useEffect } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import axios from "axios";
+import { API } from "../App";
+import { Button } from "@/components/ui/button";
+import { ArrowLeft, Play, ChevronDown, ChevronUp } from "lucide-react";
+import { toast } from "sonner";
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
-} from '@/components/ui/accordion';
+} from "@/components/ui/accordion";
+
+// Component for episode thumbnail with fallback
+const EpisodeThumbnail = ({ thumbnailUrl, title }) => {
+  const [imageError, setImageError] = useState(false);
+
+  if (!thumbnailUrl || imageError) {
+    return (
+      <div className="flex-shrink-0 w-12 h-12 bg-[#e50914] rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
+        <Play className="w-6 h-6 text-white" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex-shrink-0 relative w-20 h-12 rounded overflow-hidden group-hover:scale-105 transition-transform bg-[#1a1a1a]">
+      <img
+        src={thumbnailUrl}
+        alt={title}
+        className="w-full h-full object-cover"
+        onError={() => setImageError(true)}
+      />
+      <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+        <Play className="w-6 h-6 text-white" />
+      </div>
+    </div>
+  );
+};
 
 const ShowDetailPage = () => {
   const { showId } = useParams();
@@ -32,19 +59,25 @@ const ShowDetailPage = () => {
       ]);
 
       setShow(showRes.data);
-      const sortedSeasons = seasonsRes.data.sort((a, b) => a.season_number - b.season_number);
+      const sortedSeasons = seasonsRes.data.sort(
+        (a, b) => a.season_number - b.season_number
+      );
       setSeasons(sortedSeasons);
 
       // Fetch episodes for each season
       const episodesData = {};
       for (const season of sortedSeasons) {
-        const episodesRes = await axios.get(`${API}/episodes?season_id=${season.id}`);
-        episodesData[season.id] = episodesRes.data.sort((a, b) => a.episode_number - b.episode_number);
+        const episodesRes = await axios.get(
+          `${API}/episodes?season_id=${season.id}`
+        );
+        episodesData[season.id] = episodesRes.data.sort(
+          (a, b) => a.episode_number - b.episode_number
+        );
       }
       setEpisodes(episodesData);
     } catch (error) {
-      console.error('Error fetching show details:', error);
-      toast.error('Failed to load show details');
+      console.error("Error fetching show details:", error);
+      toast.error("Failed to load show details");
     } finally {
       setLoading(false);
     }
@@ -86,7 +119,7 @@ const ShowDetailPage = () => {
         <div className="absolute inset-0 flex flex-col justify-end p-8 max-w-7xl mx-auto">
           <Button
             data-testid="back-btn"
-            onClick={() => navigate('/')}
+            onClick={() => navigate("/")}
             variant="ghost"
             className="absolute top-4 left-4 text-white hover:bg-white/10"
           >
@@ -94,11 +127,16 @@ const ShowDetailPage = () => {
             Back
           </Button>
 
-          <h1 className="text-5xl sm:text-6xl font-bold mb-4" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
+          <h1
+            className="text-5xl sm:text-6xl font-bold mb-4"
+            style={{ fontFamily: "Space Grotesk, sans-serif" }}
+          >
             {show.name}
           </h1>
           {show.description && (
-            <p className="text-lg text-gray-300 max-w-3xl mb-6">{show.description}</p>
+            <p className="text-lg text-gray-300 max-w-3xl mb-6">
+              {show.description}
+            </p>
           )}
         </div>
       </div>
@@ -139,16 +177,25 @@ const ShowDetailPage = () => {
                         onClick={() => navigate(`/watch/${episode.id}`)}
                         className="flex items-center gap-4 p-4 bg-[#0a0a0a] hover:bg-[#222] rounded-lg cursor-pointer transition-colors group"
                       >
-                        <div className="flex-shrink-0 w-12 h-12 bg-[#e50914] rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
-                          <Play className="w-6 h-6 text-white" />
-                        </div>
+                        <EpisodeThumbnail
+                          thumbnailUrl={episode.thumbnail_url}
+                          title={episode.title}
+                        />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className="text-gray-400 text-sm">Episode {episode.episode_number}</span>
-                            <span className="text-white font-medium">{episode.title}</span>
+                            <span className="text-gray-400 text-sm">
+                              Episode {episode.episode_number}
+                            </span>
+                            {episode.title && (
+                              <span className="text-white font-medium">
+                                {episode.title}
+                              </span>
+                            )}
                           </div>
                           {episode.description && (
-                            <p className="text-gray-400 text-sm mt-1 line-clamp-2">{episode.description}</p>
+                            <p className="text-gray-400 text-sm mt-1 line-clamp-2">
+                              {episode.description}
+                            </p>
                           )}
                         </div>
                         {episode.duration && (
